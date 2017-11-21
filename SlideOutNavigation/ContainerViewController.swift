@@ -61,6 +61,9 @@ class ContainerViewController: UIViewController {
     addChildViewController(centerNavigationController)
     
     centerNavigationController.didMove(toParentViewController: self)
+    
+    let panGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(handlePanGesture(_:)))
+    centerNavigationController.view.addGestureRecognizer(panGestureRecognizer)
   }
 }
 
@@ -148,7 +151,7 @@ extension ContainerViewController:CenterViewControllerDelegate {
   fileprivate func animateRightPanel(shouldExpand: Bool) {
     if (shouldExpand) {
       currentState = .rightPanelExpanded
-      animateCenterPanelXPosition(targetPosition: centerNavigationController.view.frame.size.width + centerPanelExpandedOffset)
+      animateCenterPanelXPosition(targetPosition: -centerNavigationController.view.frame.size.width + centerPanelExpandedOffset)
     } else {
       animateCenterPanelXPosition(targetPosition: 0, competion: { (success) in
         self.currentState = .bothCollapsed
@@ -183,6 +186,49 @@ extension ContainerViewController:CenterViewControllerDelegate {
       centerNavigationController.view.layer.shadowOpacity = 0.8
     } else {
       centerNavigationController.view.layer.shadowOpacity = 0.0
+    }
+  }
+}
+
+extension ContainerViewController: UIGestureRecognizerDelegate {
+  @objc func handlePanGesture(_ recognizer: UIPanGestureRecognizer) {
+    let gestureIsDraggingFromLeftToRight = (recognizer.velocity(in: view).x > 0)
+    
+    switch recognizer.state {
+      
+    case .began:
+      if currentState == .bothCollapsed {
+        if gestureIsDraggingFromLeftToRight {
+          addLeftPanelViewController()
+        } else {
+          addRightPanelViewController()
+        }
+        
+        showShadowForCenterViewController(true)
+      }
+      
+    case .changed:
+      if let rview = recognizer.view {
+        rview.center.x = rview.center.x + recognizer.translation(in: view).x
+        recognizer.setTranslation(CGPoint.zero, in: view)
+      }
+      
+    case .ended:
+      if let _ = leftViewController,
+        let rview = recognizer.view {
+        // animate the side panel open or closed based on whether the view
+        // has moved more or less than halfway
+        let hasMovedGreaterThanHalfway = rview.center.x > view.bounds.size.width
+        animateLeftPanel(shouldExpand: hasMovedGreaterThanHalfway)
+        
+      } else if let _ = rightViewController,
+        let rview = recognizer.view {
+        let hasMovedGreaterThanHalfway = rview.center.x < 0
+        animateRightPanel(shouldExpand: hasMovedGreaterThanHalfway)
+      }
+      
+    default:
+      break
     }
   }
 }
